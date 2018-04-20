@@ -23,7 +23,7 @@ class trafficManager:
         returns max value and trafficMatrix(numpy float64 array)
         '''
         #Generate NxN matrix for network with N nodes
-        trafficMatrix = np.array([[0 for x in range(len(self.topology.nodeList))] for y in self.topology.nodeList],dtype=np.float_)
+        trafficMatrix = np.array([[0 for x in range(self.topology.numSRC)] for y in range(self.topology.numDEST)],dtype=np.float_)
         #Read trace file and add up traffic per channel
         f = open(self.filename,'r')
         for i, line in enumerate(f):
@@ -31,6 +31,7 @@ class trafficManager:
             if len(line)==5:
                 #Rows are destinations. columns are sources
                 trafficMatrix[int(line[3])][int(line[2])] += int(line[4])
+        f.close()
         return trafficMatrix
 
     def printTrafficMatrix(self):
@@ -92,7 +93,7 @@ class trafficManager:
         smallestCycles = None
         for col in columnList:
             testCM[:,columnNum] = col
-            cycle = self.calcCyclesInternal(self.trafficMatrix,testCM)
+            cycle = self.calcCycles(self.trafficMatrix,testCM)
             if cycle != None:
                 if cycle < smallestCycles or smallestCycles==None:
                     smallestCycles = cycle
@@ -104,7 +105,7 @@ class trafficManager:
         else:
             return column
 
-    def calcCyclesInternal(self,trafficMatrix,connectivityMatrix):
+    def calcCycles(self,trafficMatrix,connectivityMatrix):
         '''
         Very simplistic way to calculate the cycles requried to send all packets
         Just divides the total size of bytes seen on channel by the bw to get cycle num.
@@ -124,20 +125,9 @@ class trafficManager:
                         return None
         return cycles
 
-    def calcCycles(self):
+    def printCycles(self):
         '''
-        Very simplistic way to calculate the cycles requried to send all packets
-        Just divides the total size of bytes seen on channel by the bw to get cycle num.
-        Compare different topologies cycleNum together to figure out speed up
+        calls calc Cycles and prints result
         '''
-        #Total number of cycles
-        cycles = 0
-        for i in range(self.numRows):
-            for j in range(self.numCols):
-                #If i, destId, is in j, sourceId, links dict
-                if i in self.topology.nodeList[j].links.keys():
-                    cycles += self.trafficMatrix[i][j]/self.topology.nodeList[j].links[i]
-                else:
-                    #Make sure that we don't pass over nonzero value!
-                    assert(self.trafficMatrix[i][j]==0)
+        cycles = self.calcCycles(self.trafficMatrix,self.topology.connectivityMatrix)
         print "Topology: " + self.topology.filename + "\nTraffic: " + self.filename + "\n\tArbitray Cycle Units: " + str(cycles) + '\n'

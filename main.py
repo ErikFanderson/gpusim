@@ -1,4 +1,3 @@
-from node import node
 from topology import topology
 from trafficManager import *
 from traceGen import *
@@ -15,23 +14,18 @@ from traceGen import *
 
 
 if __name__ == "__main__":
-    ##Generate Topologies
-    #Original Topology
-    topo1 = topology("./connectionFiles/connectionFile")
     #Generate Traces from topology - WILL ONLY GENERATE TRACE BETWEEN NODES THAT ARE CONNECTED IN NETWORK PASSED TO traceGen()
-    traceGen(filename="traceTest",numPackets=1000,topology=topo1,guard=100)
+    #traceGen(filename="traceTest",numPackets=1000,topology=topo1,guard=100)
     #Create Traffic Manager from trace file and networks
-    TM1 = trafficManager("./traceFiles/traceTest",topo1)
-    #TM1.topology.printConnectivity()
+    TM1 = trafficManager("./traceFiles/traceTest",topology("./connectionFiles/connectionFile"))
     #Generate Optimized topology file
     TM1.genOptimizedTopology("./connectionFiles/connectionsOptimized")
     #Create optimized topology
-    topo_opt = topology("./connectionFiles/connectionsOptimized")
-    TM2 = trafficManager("./traceFiles/traceTest",topo_opt)
+    TM2 = trafficManager("./traceFiles/traceTest",topology("./connectionFiles/connectionsOptimized"))
     #Print Results
-    TM1.calcCycles()
-    TM2.calcCycles()
+    TM1.printCycles()
+    TM2.printCycles()
 
-    TM1.topology.printConnectivity()
-    TM2.printTrafficMatrix()
-    TM2.topology.printConnectivity()
+    #TM1.topology.printConnectivity()
+    #TM2.printTrafficMatrix()
+    #TM2.topology.printConnectivity()
