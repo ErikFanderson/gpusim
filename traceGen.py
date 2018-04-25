@@ -14,10 +14,10 @@ def traceGen(filename,topology,numPackets,guard):
         #Delay
         f.write(' delay')
         #Source ID
-        randNode = choice(topology.nodeList)
-        f.write(' ' + str(randNode.nodeId))
+        randNode = choice(range(topology.numSRC))
+        f.write(' ' + str(randNode))
         #Destination ID
-        f.write(' ' + str(choice(list(randNode.links))))
+        f.write(' ' + str(choice(topology.srcDict[randNode])))
         #Packet Size - Could create file with weighted distribution of sizes and then choose a random index to grab size from file
         f.write(' ' + str(randint(16,288)))
         f.write('\n')

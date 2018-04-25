@@ -1,16 +1,20 @@
 #Randomly generates traces based off of network
 import matplotlib.pyplot as plt
+import scipy.io
 import numpy as np
 from copy import copy
 from itertools import *
+import globals
+from topology import topology
 
 class trafficManager:
-    def __init__(self,filename,topology):
+    def __init__(self,filename,topology,scaler):
         '''
         initializes traffic manager object with a filename and network
         '''
         self.filename = filename
         self.topology = topology
+        self.scaler = scaler
         self.trafficMatrix = self.returnTrafficMatrix()
         self.numRows = self.trafficMatrix.shape[0]
         self.numCols = self.trafficMatrix.shape[1]
@@ -40,23 +44,25 @@ class trafficManager:
         Normalizes the number of bytes sent along each channel by the max number of bytes sent across any one channel
         returns max value and trafficMatrix
         '''
-        plt.imshow(self.TM_Normalized, cmap=plt.cm.hot)
+        plt.figure(globals.figureNum)
+        plt.imshow(self.TM_Normalized, cmap=plt.cm.gray)
         plt.clim(0,1)
         plt.gca().invert_yaxis()
-        plt.title("Traffic Matrix")
+        plt.title("Traffic Matrix: " + self.filename)
         plt.xlabel("Source ID")
         plt.ylabel("Destination ID")
         plt.colorbar()
-        plt.show()
+        #Prints normalized matrix to .mat located in project directory
+        scipy.io.savemat('C:\Users\\bnsc5\Documents\MatlabProjects\OpticalInterconnects\Project\\figure' + str(globals.figureNum), mdict={'figure' + str(globals.figureNum): self.TM_Normalized})
+        globals.figureNum += 1
 
-    def genOptimizedTopology(self,filename):
+    def genOptimizedTopology(self,filename,scaler):
         '''
         Generates the optimized topology
         filename => File that new connections file will be written to
         '''
-        ######%%%%%%%%######
         newCM = copy(self.topology.connectivityMatrix)
-        ######%%%%%%%%######
+        newCM = np.multiply(newCM,scaler)
         #Iterate through sources (columns)
         f = open(filename,'w')
         f.write("//Optimized Connections File\n//TraceFile: " + self.filename + '\n')
@@ -68,19 +74,24 @@ class trafficManager:
                     f.write(' ' + str(j) + '(' + str(element) + ')')
             f.write('\n')
         f.close()
+        #
+        return trafficManager(self.filename,topology(filename),scaler)
 
     def optimizeConnectivity(self,column,columnNum):
         '''
         returns the column but optimized by exhaustively calculating every
-        n multichoose k where n is number of nodes and k is number of bw units available per node
+        n multichoose k where n is number of connected nodes and k is number of bw units available per node
         '''
+        #########################################################################
+        ##Generate a list of all possible columns for the nodes that source needs to connect to
         #save original column
         originalColumn = copy(column)
         testCM = copy(self.topology.connectivityMatrix)
-        #Get number ofbw units to allocate and a list with all nodes
+        #Get number of bw units to allocate and a list with all (connected) nodes
         k = int(column.sum())
-        nodes = range(self.topology.numDEST)
-        #Generate a list of all possible columns
+        nodes = self.topology.srcDict[columnNum]
+        #This is how many units you can allocate after allocating
+        k -= len(nodes)
         columnList = []
         totalCombinations = combinations_with_replacement(nodes, k)
         for combination in totalCombinations:
@@ -89,23 +100,38 @@ class trafficManager:
             for node in combination:
                 column[node] += 1
             columnList.append(column)
+        #########################################################################
+
+        ##########################################################################
+        #Add 1 to each of the elements that are in the nodes list for each column
+        for i,col in enumerate(columnList):
+            for j,element in enumerate(column):
+                if j in nodes:
+                    columnList[i][j] += 1
+        #########################################################################
+
+        #########################################################################
         #Test each column and find the one that gives minimum cycles
         smallestCycles = None
         for col in columnList:
             testCM[:,columnNum] = col
-            cycle = self.calcCycles(self.trafficMatrix,testCM)
+            #cycle = self.calcCycles(self.trafficMatrix,testCM)
+            cycle = self.calcRTLColumn(self.trafficMatrix,testCM,columnNum)
             if cycle != None:
                 if cycle < smallestCycles or smallestCycles==None:
                     smallestCycles = cycle
                     column = col
+        #########################################################################
 
+        #########################################################################
         #If traffic matrix is empty for a given column then return original column
         if self.trafficMatrix[:,columnNum].sum() == 0:
             return originalColumn
         else:
             return column
+        #########################################################################
 
-    def calcCycles(self,trafficMatrix,connectivityMatrix):
+    def calcRTL(self,trafficMatrix,connectivityMatrix):
         '''
         Very simplistic way to calculate the cycles requried to send all packets
         Just divides the total size of bytes seen on channel by the bw to get cycle num.
@@ -116,18 +142,37 @@ class trafficManager:
         cycles = 0
         for i in range(self.numRows):
             for j in range(self.numCols):
-                #If i, destId, is in j, sourceId, links dict
                 if trafficMatrix[i][j] != 0:
                     if connectivityMatrix[i][j] != 0:
-                        cycles += trafficMatrix[i][j]/connectivityMatrix[i][j]
+                        cycles += (trafficMatrix[i][j]/connectivityMatrix[i][j])*self.scaler
                     else:
                         #nonzero traffic but no connectivity! Invalid thus return None
                         return None
         return cycles
 
-    def printCycles(self):
+    def calcRTLColumn(self,trafficMatrix,connectivityMatrix,columnNum):
+        '''
+        Very simplistic way to calculate the cycles requried to send all packets
+        Just divides the total size of bytes seen on channel by the bw to get cycle num.
+        Compare different topologies cycleNum together to figure out speed up
+        Rewritten for just column! Optimize!
+        '''
+        #Total number of cycles for column
+        cycles = 0
+        for i in range(self.numRows):
+            if trafficMatrix[i][columnNum] != 0:
+                if connectivityMatrix[i][columnNum] != 0:
+                    cycles += (trafficMatrix[i][columnNum]/connectivityMatrix[i][columnNum])*self.scaler
+                    globals.numRTLs += 1
+                else:
+                    #nonzero traffic but no connectivity! Invalid thus return None
+                    return None
+        return cycles
+
+    def printRTL(self):
         '''
         calls calc Cycles and prints result
         '''
-        cycles = self.calcCycles(self.trafficMatrix,self.topology.connectivityMatrix)
-        print "Topology: " + self.topology.filename + "\nTraffic: " + self.filename + "\n\tArbitray Cycle Units: " + str(cycles) + '\n'
+        cycles = self.calcRTL(self.trafficMatrix,self.topology.connectivityMatrix)
+        print "Topology: " + self.topology.filename + "\nTraffic: " + self.filename + "\n\tRelative Transmission Latency: " + str(cycles) + ' [AU]\n'
+        return cycles

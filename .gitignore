@@ -2,3 +2,4 @@
 *.png
 connectionFiles/
 traceFiles/
+*.pyo

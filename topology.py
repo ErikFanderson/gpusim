@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
+import scipy.io
 import numpy as np
+import globals
 
 class topology:
     def __init__(self,filename):
@@ -7,10 +9,19 @@ class topology:
         topology represented by traffic matrix
         '''
         self.filename = filename
-        #Populates connectivity matrix
+        #Populates connectivityMatrix,numSRC,numDEST,and srcDict
+        self.populate()
+
+    def populate(self):
+        self.srcDict = {}
         self.connectivityMatrix = self.returnConnectivityMatrix()
         self.numSRC = self.connectivityMatrix.shape[0]
         self.numDEST = self.connectivityMatrix.shape[1]
+        for j in range(self.numSRC):
+            self.srcDict[j] = []
+            for i in range(self.numDEST):
+                if self.connectivityMatrix[i][j] > 0:
+                        self.srcDict[j].append(i)
 
     def returnConnectivityMatrix(self):
         '''
@@ -46,12 +57,14 @@ class topology:
         '''
         prints connectivity matrix using matplotlib
         '''
-        plt.imshow(self.connectivityMatrix, cmap=plt.cm.hot)
-        #print self.connectivityMatrix
-        plt.clim(0,6)
+        plt.figure(globals.figureNum)
+        plt.imshow(self.connectivityMatrix, cmap=plt.cm.gray)
+        plt.clim(0,self.connectivityMatrix[:,0].sum())
         plt.gca().invert_yaxis()
-        plt.title("Connectivity Matrix")
+        plt.title("Connectivity Matrix: " + self.filename)
         plt.xlabel("Source ID")
         plt.ylabel("Destination ID")
         plt.colorbar()
-        plt.show()
+        #Prints normalized matrix to .mat located in project directory
+        scipy.io.savemat('C:\Users\\bnsc5\Documents\MatlabProjects\OpticalInterconnects\Project\\figure' + str(globals.figureNum), mdict={'figure' + str(globals.figureNum): self.connectivityMatrix})
+        globals.figureNum += 1
