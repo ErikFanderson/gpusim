@@ -6,6 +6,7 @@ from copy import copy
 from itertools import *
 import globals
 from topology import topology
+import timing
 
 class trafficManager:
     def __init__(self,filename,topology,scaler):
@@ -15,19 +16,41 @@ class trafficManager:
         self.filename = filename
         self.topology = topology
         self.scaler = scaler
-        self.trafficMatrix = self.returnTrafficMatrix()
-        self.numRows = self.trafficMatrix.shape[0]
-        self.numCols = self.trafficMatrix.shape[1]
+        self.srcDict,self.trafficMatrix = self.populate()
+        self.dim = self.trafficMatrix.shape[0]
+        assert(self.dim == self.topology.dim)
         self.TM_Normalized = self.trafficMatrix/np.amax(self.trafficMatrix)
 
-    def returnTrafficMatrix(self):
+    # def returnSrcDict(self):
+    #     '''
+    #     reads through traffic file and determines which GPUs must be connected
+    #     '''
+    #     srcDict = {}
+        # for i in range(self.numCols):
+        #     srcDict[i] = []
+    #     #Read trace file and creeate dictionary
+    #     f = open(self.filename,'r')
+    #     for i, line in enumerate(f):
+    #         line = line.split(' ')
+    #         if len(line)==5:
+    #             src = int(line[2])
+    #             dst = int(line[3])
+    #             if dst not in srcDict[src]:
+    #                 srcDict[src].append(dst)
+    #     f.close()
+    #     return srcDict
+
+    def populate(self):
         '''
-        prints traffic matrix using matplotlib
+        returns traffic matrix and srcDict from trace file
         Normalizes the number of bytes sent along each channel by the max number of bytes sent across any one channel
         returns max value and trafficMatrix(numpy float64 array)
         '''
+        srcDict = {}
         #Generate NxN matrix for network with N nodes
-        trafficMatrix = np.array([[0 for x in range(self.topology.numSRC)] for y in range(self.topology.numDEST)],dtype=np.float_)
+        for i in range(self.topology.dim):
+            srcDict[i] = []
+        trafficMatrix = np.array([[0 for x in range(self.topology.dim)] for y in range(self.topology.dim)],dtype=np.float_)
         #Read trace file and add up traffic per channel
         f = open(self.filename,'r')
         for i, line in enumerate(f):
@@ -35,8 +58,12 @@ class trafficManager:
             if len(line)==5:
                 #Rows are destinations. columns are sources
                 trafficMatrix[int(line[3])][int(line[2])] += int(line[4])
+                src = int(line[2])
+                dst = int(line[3])
+                if dst not in srcDict[src]:
+                    srcDict[src].append(dst)
         f.close()
-        return trafficMatrix
+        return srcDict,trafficMatrix
 
     def printTrafficMatrix(self):
         '''
@@ -66,7 +93,7 @@ class trafficManager:
         #Iterate through sources (columns)
         f = open(filename,'w')
         f.write("//Optimized Connections File\n//TraceFile: " + self.filename + '\n')
-        for i in range(self.topology.numSRC):
+        for i in range(self.dim):
             newCM[:,i] = self.optimizeConnectivity(newCM[:,i],i)
             f.write(str(i))
             for j,element in enumerate(newCM[:,i]):
@@ -89,7 +116,7 @@ class trafficManager:
         testCM = copy(self.topology.connectivityMatrix)
         #Get number of bw units to allocate and a list with all (connected) nodes
         k = int(column.sum())
-        nodes = self.topology.srcDict[columnNum]
+        nodes = self.srcDict[columnNum]
         #This is how many units you can allocate after allocating
         k -= len(nodes)
         columnList = []
@@ -140,12 +167,15 @@ class trafficManager:
         '''
         #Total number of cycles
         cycles = 0
-        for i in range(self.numRows):
-            for j in range(self.numCols):
+        for i in range(self.dim):
+            for j in range(self.dim):
                 if trafficMatrix[i][j] != 0:
                     if connectivityMatrix[i][j] != 0:
                         cycles += (trafficMatrix[i][j]/connectivityMatrix[i][j])*self.scaler
+                        globals.totalB += trafficMatrix[i][j]
                     else:
+                        print
+                        print "ERROR: Nonzero traffic between GPUs without connection\n"
                         #nonzero traffic but no connectivity! Invalid thus return None
                         return None
         return cycles
@@ -159,11 +189,11 @@ class trafficManager:
         '''
         #Total number of cycles for column
         cycles = 0
-        for i in range(self.numRows):
+        for i in range(self.dim):
             if trafficMatrix[i][columnNum] != 0:
                 if connectivityMatrix[i][columnNum] != 0:
                     cycles += (trafficMatrix[i][columnNum]/connectivityMatrix[i][columnNum])*self.scaler
-                    globals.numRTLs += 1
+                    #globals.numRTLs += 1
                 else:
                     #nonzero traffic but no connectivity! Invalid thus return None
                     return None
@@ -174,5 +204,158 @@ class trafficManager:
         calls calc Cycles and prints result
         '''
         cycles = self.calcRTL(self.trafficMatrix,self.topology.connectivityMatrix)
+        #print self.topology.connectivityMatrix
         print "Topology: " + self.topology.filename + "\nTraffic: " + self.filename + "\n\tRelative Transmission Latency: " + str(cycles) + ' [AU]\n'
+        #for i in range(8):
+            #print int(self.topology.connectivityMatrix[i,:].sum())
         return cycles
+
+
+##################################################################################################################################################
+##################################################################################################################################################
+#Below is buggy code that was supposed to be used to optimize connectivity w/o requiring additional receivers.
+##################################################################################################################################################
+##################################################################################################################################################
+    def recursiveFunc(self,srcNum,currentMatrix):
+        ### Exit Condition ###
+        if srcNum == 8:
+            #Add 1 to each of the elements that are in the nodes list for each column
+            for i in range(self.dim):
+                for j in range(self.dim):
+                    if j in self.srcDict[i]:
+                        currentMatrix[j,i] += 1
+            #print self.calcRTL(self.trafficMatrix,currentMatrix)
+            #if RTLTemp < RTL_low:
+            #    bestMatrix = matrix
+            #    RTL_low = RTLTemp
+            globals.count += 1
+            print currentMatrix
+            #print globals.count
+            #print currentMatrix
+            return
+        else:
+            rowList = []
+            nodes = self.srcDict[srcNum]
+            k = int(self.topology.connectivityMatrix[:,0].sum())
+            k -= len(nodes)
+            #Generate the rows that can still be allocated
+            for i in range(self.dim):
+                if (currentMatrix[i,:].sum() < k) and (i in nodes):
+                    for j in range(k - currentMatrix[i,:].sum()):
+                        rowList.append(i)
+            #This is how many units you can allocate after looking at current matrix
+            if rowList:
+                for combination in combinations(rowList, k):
+                    combination = list(combination)
+                    column = np.zeros(self.dim).astype(int)
+                    for node in combination:
+                        column[node] += 1
+                    currentMatrix[:,srcNum] = column
+                    self.recursiveFunc(srcNum+1,copy(currentMatrix))
+                    #globals.count += 1
+            else:
+                self.recursiveFunc(srcNum+1,copy(currentMatrix))
+                #globals.count += 1
+
+    def genOptimizedTopologyTEST(self,filename,scaler):
+        '''
+        Generates the optimized topology
+        filename => File that new connections file will be written to
+        ONLY USE W/ SCALER EQUAL TO 1
+        '''
+        #self.recursiveFunc(0,np.array([[0 for x in range(self.topology.numDEST)] for y in range(self.topology.numDEST)]))
+
+        newCM = copy(self.topology.connectivityMatrix)
+        newCM = np.multiply(newCM,scaler)
+        #Iterate through sources (columns)
+        newCM = self.optimizeMatrix()
+        f = open(filename + 'TEST','w')
+        f.write("//Optimized Connections File\n//TraceFile: " + self.filename + '\n')
+        for i in range(self.dim):
+            f.write(str(i))
+            for j,element in enumerate(newCM[:,i]):
+                if element != 0:
+                    f.write(' ' + str(j) + '(' + str(element) + ')')
+            f.write('\n')
+        f.close()
+        print globals.count
+        #return trafficManager(self.filename,topology(filename),scaler)
+
+
+    def optimizeMatrix(self):
+        '''
+        Ensures row and column totals add up to 6
+        '''
+        RTL_low = self.calcRTL(self.trafficMatrix,self.topology.connectivityMatrix)
+        bestMatrix = self.topology.connectivityMatrix
+        matrix = np.array([[0 for x in range(self.topology.numSRC)] for y in range(self.topology.numDEST)])
+        #Generate all possible columns
+        columnDict = {}
+        for i in range(self.dim):
+            columnDict[i] = self.genColumnList(i,6)
+        counter = 0
+        #iterate through all combinations of columns
+        for col0 in columnDict[0]:
+            for col1 in columnDict[1]:
+                for col2 in columnDict[2]:
+                    for col3 in columnDict[3]:
+                        for col4 in columnDict[4]:
+                            for col5 in columnDict[5]:
+                                for col6 in columnDict[6]:
+                                    for col7 in columnDict[7]:
+                                        #counter += 1
+                                        #if counter == 500000:
+                                        #    print timing.now()
+                                        check = 0
+                                        matrix[:,0] = col0
+                                        matrix[:,1] = col1
+                                        matrix[:,2] = col2
+                                        matrix[:,3] = col3
+                                        matrix[:,4] = col4
+                                        matrix[:,5] = col5
+                                        matrix[:,6] = col6
+                                        matrix[:,7] = col7
+                                        for i in range(self.dim):
+                                            if matrix[i,:].sum() > 6:
+                                                check = 1
+                                        if check == 0:
+                                            globals.count += 1
+                                            RTLTemp = self.calcRTL(self.trafficMatrix,matrix)
+                                            if RTLTemp < RTL_low:
+                                                bestMatrix = matrix
+                                                RTL_low = RTLTemp
+        print RTL_low
+        return bestMatrix
+
+    def genColumnList(self,columnNum,k):
+        '''
+        returns the column but optimized by exhaustively calculating every
+        n multichoose k where n is number of connected nodes and k is number of bw units available per node
+        '''
+        #########################################################################
+        ##Generate a list of all possible columns for the nodes that source needs to connect to
+        #save original column
+        #originalColumn = copy(column)
+        #testCM = copy(self.topology.connectivityMatrix)
+        #Get number of bw units to allocate and a list with all (connected) nodes
+        #k = int(column.sum())
+        nodes = self.srcDict[columnNum]
+        #This is how many units you can allocate after allocating
+        k -= len(nodes)
+        columnList = []
+        totalCombinations = combinations_with_replacement(nodes, k)
+        for combination in totalCombinations:
+            combination = list(combination)
+            column = np.zeros(self.dim).astype(int)
+            for node in combination:
+                column[node] += 1
+            columnList.append(column)
+        #Add 1 to each of the elements that are in the nodes list for each column
+        for i,col in enumerate(columnList):
+            for j,element in enumerate(column):
+                if j in nodes:
+                    columnList[i][j] += 1
+
+        return columnList
+##################################################################################################################################################
+##################################################################################################################################################

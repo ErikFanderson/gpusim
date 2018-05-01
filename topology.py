@@ -15,13 +15,14 @@ class topology:
     def populate(self):
         self.srcDict = {}
         self.connectivityMatrix = self.returnConnectivityMatrix()
-        self.numSRC = self.connectivityMatrix.shape[0]
-        self.numDEST = self.connectivityMatrix.shape[1]
-        for j in range(self.numSRC):
-            self.srcDict[j] = []
-            for i in range(self.numDEST):
-                if self.connectivityMatrix[i][j] > 0:
-                        self.srcDict[j].append(i)
+        self.dim = self.connectivityMatrix.shape[0]
+        assert(self.dim == self.connectivityMatrix.shape[1])
+        #GENERATE SOURCE DICT FROM TRAFFIC MATRIX -
+        #for j in range(self.numSRC):
+        #    self.srcDict[j] = []
+        #    for i in range(self.numDEST):
+        #        if self.connectivityMatrix[i][j] > 0:
+        #                self.srcDict[j].append(i)
 
     def returnConnectivityMatrix(self):
         '''

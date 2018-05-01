@@ -3,3 +3,6 @@
 connectionFiles/
 traceFiles/
 *.pyo
+nvproflogs/
+p3-x16-topologyInfo/
+data/
