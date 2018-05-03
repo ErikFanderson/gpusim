@@ -4,91 +4,55 @@ from traceGen import *
 import globals
 import timing
 import logParser
+import os
 
-#To do
-#3. Begin writing paper intro [NOW]
-#4. Get traces from Jorge
-#7. Generate cost model or something related to how much you should increase granularity before switch cost becomes prohibitive
-#8. Write up for OI class
+
+def printTraffic(baselineConnections,dir):
+    '''
+    prints all traffic matrices as .mat files to matlab directory
+    '''
+    for filename in os.listdir(dir):
+        if filename.endswith(".log"):
+            TM_original = trafficManager("./traceFiles/" + filename.strip(".log"),topology("./connectionFiles/" + baselineConnections),1)
+            TM_optimized = TM_original.genOptimizedTopology("./connectionFiles/connectionsOptimized_"+ filename.strip(".log"),1)
+            #TM_optimized.topology.printConnectivity()
+            TM_optimized.generateTrafficMat()
+
+def printConnectivity(baselineConnections,dir,scaler):
+    '''
+    prints original conenctivity matrix
+    prints all optimized connectivity matrices for log files in dir.
+    Prints => generates .mat file in matlab directory
+    scaler is the multiplier for BUs (larger scaler => finer granularity of provisioning)
+    '''
+    #Create Lists for Data
+    fileList = np.zeros((len(os.listdir(dir)),), dtype=np.object)
+    percentageList = np.zeros((len(os.listdir(dir)),))
+    #Run Optimization Algorithm
+    baseLineTopology = topology("./connectionFiles/" + baselineConnections)
+    for i,filename in enumerate(os.listdir(dir)):
+        if filename.endswith(".log"):
+            TM_original = trafficManager("./traceFiles/" + filename.strip(".log"),baseLineTopology,1)
+            RTL_original = TM_original.returnRTL()
+            TM_optimized = TM_original.genOptimizedTopology("./connectionFiles/connectionsOptimized_scaler" + str(scaler) + "_" +filename.strip(".log"),scaler)
+            TM_optimized.generateConnectivityMat()
+            percentageList[i] = ((RTL_original - TM_optimized.returnRTL())/RTL_original) * 100
+            print filename.strip('log') + ': ' + str(percentageList[i]) + '% Decrease'
+            fileList[i] = filename.strip(".log")
+    #Generate mat for baseline topology
+    TM_original.generateConnectivityMat()
+    #Generate mat for percentage decrease data
+    dict = {'filename': fileList,'percentDec':percentageList}
+    scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/percentDec', mdict=dict)
 
 if __name__ == "__main__":
+    ################################################
     #Initialize global variables and timing module
     globals.init()
     timing.init()
-    ###########################################################################################
-    #Generate Traces from topology - WILL ONLY GENERATE TRACE BETWEEN NODES THAT ARE CONNECTED IN NETWORK PASSED TO traceGen()
-    #topo1 = topology("./connectionFiles/dgx1")
-    #traceGen(filename="./traceFiles/traceTest",numPackets=1000,topology=topo1,guard=100)
-    ###########################################################################################
-    #traceFile = "cifar10_alexnet_parameterserver_6473"
-    #traceFile = "cifar10_alexnet_replicated_6230"
-    #traceFile = "cifar10_densenet40_k12_parameterserver_9336"
-    #traceFile = "cifar10_densenet40_k12_replicated_9098"
-    #traceFile = "cifar10_densenet100_k24_replicated_9562"
-    #traceFile = "cifar10_nasnet_parameterserver_6880"
-    #traceFile = "cifar10_nasnet_replicated_7504"
-    #traceFile = "cifar10_resnet20_v2_parameterserver_8347"
-    #traceFile = "cifar10_resnet20_v2_replicated_8127"
-    #traceFile = "cifar10_resnet110_v2_replicated_8819"
-    #traceFile = "cifar10_resnet110_v2_parameterserver_8564"
-    #traceFile = "flowers_mobilenet_parameterserver_11251"
-    traceFile = "flowers_mobilenet_replicated_10889"
-    #traceFile = "flowers_vgg16_parameterserver_10212"
-    #traceFile = "flowers_vgg16_replicated_9854"
-
-    connectionFile = "p3_x16Large"
-    #traceFile = "traceTest"
-    #connectionFile = "dgx_1"
-    #traceFile = "traceTest"
-    ###########################################################################################
-    #logParser.parseLog(3,traceFile + '.log')
-    TM1 = trafficManager("./traceFiles/" + traceFile,topology("./connectionFiles/" + connectionFile),1)
-    ####################### Initial Column-Level Scope RTL Optimization #######################
-    cycleInit = TM1.printRTL()
-    TM1.printTrafficMatrix()
-    TM1.topology.printConnectivity()
-    #print "%.3g" % globals.totalB + " Bytes"
-    #Scan through optimizations with different BU granularity
-    RTLList = []
-    numPlots = 1
-    scalerList = range(numPlots)
-    for i in scalerList:
-        scalerList[i] = pow(2,i)
-        TM_opt = TM1.genOptimizedTopology("./connectionFiles/connectionsOptimized_"+str(scalerList[i]),scalerList[i])
-        RTLList.append(TM_opt.printRTL())
-        TM_opt.topology.printConnectivity()
-        percentageDec = (cycleInit - RTLList[i])/cycleInit
-        print "Percent RTL Decrease: " + str(percentageDec*100) + "%"
-    ###########################################################################################
-
-
-    #print "num RTLs: " + str(globals.numRTLs)
-    #Print Optimizations for all plots!
-    #plt.figure(globals.figureNum)
-    #plt.plot(scalerList,cycleList,'*-')
-    #plt.gca().invert_yaxis()
-    #plt.title("Traffic Matrix")
-    #plt.xlabel("Scaler Value")
-    #plt.ylabel("Total RTL")
-    #globals.figureNum += 1
-    ###########################################################################################
-    ###########################################################################################
-    #TM1.printCycles()
-    #TM2.printCycles()
-    #TM3.printCycles()
-    #TM4.printCycles()
-    #TM5.printCycles()
-    ###########################################################################################
-    #TM1 = trafficManager("./traceFiles/traceTest",topology("./connectionFiles/connectionFile"))
-    #TM1.genOptimizedTopology("./connectionFiles/connectionsOptimized",2)
-    #TM2 = trafficManager("./traceFiles/traceTest",topology("./connectionFiles/connectionsOptimized"))
-    ###########################################################################################
-    #TM1.printRTL()
-    #TM2.printCycles()
-    #TM1.printTrafficMatrix()
-    #TM1.topology.printConnectivity()
-    #TM2.topology.printConnectivity()
-    #TM3.topology.printConnectivity()
-    #TM4.topology.printConnectivity()
-    #TM5.topology.printConnectivity()
-    # plt.show()
+    ################################################
+    baselineConnections = "p3_x16Large"
+    dir = './nvproflogs'
+    #printTraffic(baselineConnections,dir)
+    #SCALER ONLY => (1,2,4,8)
+    printConnectivity(baselineConnections,dir,8)

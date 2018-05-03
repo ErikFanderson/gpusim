@@ -1,6 +1,6 @@
+import numpy as np
 import matplotlib.pyplot as plt
 import scipy.io
-import numpy as np
 import globals
 
 class topology:
@@ -59,7 +59,7 @@ class topology:
         prints connectivity matrix using matplotlib
         '''
         plt.figure(globals.figureNum)
-        plt.imshow(self.connectivityMatrix, cmap=plt.cm.gray)
+        plt.imshow(self.connectivityMatrix, cmap=plt.cm.cool)
         plt.clim(0,self.connectivityMatrix[:,0].sum())
         plt.gca().invert_yaxis()
         plt.title("Connectivity Matrix: " + self.filename)
@@ -67,5 +67,6 @@ class topology:
         plt.ylabel("Destination ID")
         plt.colorbar()
         #Prints normalized matrix to .mat located in project directory
-        scipy.io.savemat('C:\Users\\bnsc5\Documents\MatlabProjects\OpticalInterconnects\Project\\figure' + str(globals.figureNum), mdict={'figure' + str(globals.figureNum): self.connectivityMatrix})
+        #scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/' + self.filename.split('/')[-1], mdict={'figure': self.connectivityMatrix})
+        #scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/' + self.filename.split('/')[-1], mdict={'figure': self.connectivityMatrix})
         globals.figureNum += 1

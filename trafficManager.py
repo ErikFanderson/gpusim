@@ -72,16 +72,30 @@ class trafficManager:
         returns max value and trafficMatrix
         '''
         plt.figure(globals.figureNum)
-        plt.imshow(self.TM_Normalized, cmap=plt.cm.gray)
+        plt.imshow(self.TM_Normalized, cmap=plt.cm.cool)
         plt.clim(0,1)
         plt.gca().invert_yaxis()
         plt.title("Traffic Matrix: " + self.filename)
         plt.xlabel("Source ID")
         plt.ylabel("Destination ID")
         plt.colorbar()
-        #Prints normalized matrix to .mat located in project directory
-        scipy.io.savemat('C:\Users\\bnsc5\Documents\MatlabProjects\OpticalInterconnects\Project\\figure' + str(globals.figureNum), mdict={'figure' + str(globals.figureNum): self.TM_Normalized})
         globals.figureNum += 1
+
+    def generateTrafficMat(self):
+        '''
+        generates .mat file for traffic amtrix in project directory
+        '''
+        #Prints normalized matrix to .mat located in project directory
+        dict = {'data': self.TM_Normalized,'maxScale':1}
+        scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/matrices/' + self.filename.split('/')[-1], mdict=dict)
+
+    def generateConnectivityMat(self):
+        '''
+        generates .mat file for traffic amtrix in project directory
+        '''
+        #Prints normalized matrix to .mat located in project directory
+        dict = {'data': self.topology.connectivityMatrix,'maxScale':self.topology.connectivityMatrix[:,0].sum()}
+        scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/matrices/' + self.topology.filename.split('/')[-1], mdict=dict)
 
     def genOptimizedTopology(self,filename,scaler):
         '''
@@ -210,6 +224,12 @@ class trafficManager:
             #print int(self.topology.connectivityMatrix[i,:].sum())
         return cycles
 
+    def returnRTL(self):
+        '''
+        calls calc Cycles and prints result
+        '''
+        cycles = self.calcRTL(self.trafficMatrix,self.topology.connectivityMatrix)
+        return cycles
 
 ##################################################################################################################################################
 ##################################################################################################################################################
