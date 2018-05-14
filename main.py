@@ -51,8 +51,14 @@ if __name__ == "__main__":
     globals.init()
     timing.init()
     ################################################
-    baselineConnections = "p3_x16Large"
-    dir = './nvproflogs'
-    #printTraffic(baselineConnections,dir)
-    #SCALER ONLY => (1,2,4,8)
-    printConnectivity(baselineConnections,dir,8)
+    # baselineConnections = "p3_x16Large"
+    # dir = './nvproflogs'
+    # printTraffic(baselineConnections,dir)
+    # #SCALER ONLY => (1,2,4,8)
+    # printConnectivity(baselineConnections,dir,1)
+    ##### TEST #####
+    baseLineTopology = topology("./connectionFiles/p3_x16Large")
+    #traceGen('./traceFiles/3x3_trace',baseLineTopology,100,None)
+    # TM_og = trafficManager('./traceFiles/3x3_trace',baseLineTopology,1)
+    TM_og = trafficManager('./traceFiles/cifar10_alexnet_parameterserver_6473',baseLineTopology,1)
+    TM_new = TM_og.genOptimizedTopologyTEST("./connectionFiles/connectionsOptimized_TEST",1)

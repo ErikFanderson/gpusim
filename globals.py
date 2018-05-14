@@ -16,3 +16,7 @@ def init():
     totalB = 0
     global count
     count = 0
+    global matrices
+    matrices = []
+    global duplicates
+    duplicates = []

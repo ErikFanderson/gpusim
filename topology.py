@@ -7,6 +7,7 @@ class topology:
     def __init__(self,filename):
         '''
         topology represented by traffic matrix
+        srcDict => contains node ids (value) that node id (key) can send data to (different than srcDict for TM)
         '''
         self.filename = filename
         #Populates connectivityMatrix,numSRC,numDEST,and srcDict
@@ -16,13 +17,9 @@ class topology:
         self.srcDict = {}
         self.connectivityMatrix = self.returnConnectivityMatrix()
         self.dim = self.connectivityMatrix.shape[0]
+        for key, value in self.srcDict.iteritems():
+            self.srcDict[key].sort()
         assert(self.dim == self.connectivityMatrix.shape[1])
-        #GENERATE SOURCE DICT FROM TRAFFIC MATRIX -
-        #for j in range(self.numSRC):
-        #    self.srcDict[j] = []
-        #    for i in range(self.numDEST):
-        #        if self.connectivityMatrix[i][j] > 0:
-        #                self.srcDict[j].append(i)
 
     def returnConnectivityMatrix(self):
         '''
@@ -46,10 +43,12 @@ class topology:
             #capture non-commented portion of line and strip \n
             line = line.split('//')[0].strip().replace('(',' ').replace(')','').split(' ')
             if len(line) > 1:
+                src = int(line[0])
+                self.srcDict[src] = []
                 for i in range((len(line)-1)/2):
-                    src = int(line[0])
                     dest = int(line[2*i+1])
                     bw = int(line[2*i+2])
+                    self.srcDict[src].append(dest)
                     connectivityMatrix[dest][src] = bw
         f.close()
         return connectivityMatrix
@@ -66,7 +65,4 @@ class topology:
         plt.xlabel("Source ID")
         plt.ylabel("Destination ID")
         plt.colorbar()
-        #Prints normalized matrix to .mat located in project directory
-        #scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/' + self.filename.split('/')[-1], mdict={'figure': self.connectivityMatrix})
-        #scipy.io.savemat('/mnt/c/Users/bnsc5/Documents/MatlabProjects/OpticalInterconnects/Project/' + self.filename.split('/')[-1], mdict={'figure': self.connectivityMatrix})
         globals.figureNum += 1

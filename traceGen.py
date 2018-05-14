@@ -14,7 +14,7 @@ def traceGen(filename,topology,numPackets,guard):
         #Delay
         f.write(' delay')
         #Source ID
-        randNode = choice(range(topology.numSRC))
+        randNode = choice(range(topology.dim))
         f.write(' ' + str(randNode))
         #Destination ID
         f.write(' ' + str(choice(topology.srcDict[randNode])))

@@ -19,26 +19,11 @@ class trafficManager:
         self.srcDict,self.trafficMatrix = self.populate()
         self.dim = self.trafficMatrix.shape[0]
         assert(self.dim == self.topology.dim)
+        for key, value in self.srcDict.iteritems():
+            self.srcDict[key].sort()
+        if cmp(self.srcDict,self.topology.srcDict) != 0:
+            print "Traffic Matrix Not utilizing all connections"
         self.TM_Normalized = self.trafficMatrix/np.amax(self.trafficMatrix)
-
-    # def returnSrcDict(self):
-    #     '''
-    #     reads through traffic file and determines which GPUs must be connected
-    #     '''
-    #     srcDict = {}
-        # for i in range(self.numCols):
-        #     srcDict[i] = []
-    #     #Read trace file and creeate dictionary
-    #     f = open(self.filename,'r')
-    #     for i, line in enumerate(f):
-    #         line = line.split(' ')
-    #         if len(line)==5:
-    #             src = int(line[2])
-    #             dst = int(line[3])
-    #             if dst not in srcDict[src]:
-    #                 srcDict[src].append(dst)
-    #     f.close()
-    #     return srcDict
 
     def populate(self):
         '''
@@ -234,29 +219,42 @@ class trafficManager:
 ##################################################################################################################################################
 ##################################################################################################################################################
 #Below is buggy code that was supposed to be used to optimize connectivity w/o requiring additional receivers.
+#Iterative method showed no reduction in RTL!!!
 ##################################################################################################################################################
 ##################################################################################################################################################
-    def recursiveFunc(self,srcNum,currentMatrix):
+    def recursiveFuncColumn(self,count,srcOrder,currentMatrix):
         ### Exit Condition ###
-        if srcNum == 8:
+        if count == self.dim:
             #Add 1 to each of the elements that are in the nodes list for each column
-            for i in range(self.dim):
-                for j in range(self.dim):
-                    if j in self.srcDict[i]:
-                        currentMatrix[j,i] += 1
+
+            # for i in range(self.dim):
+            #     for j in range(self.dim):
+            #         if j in self.srcDict[i]:
+            #             currentMatrix[j,i] += 1
+
+            #Check to see if matrix is duplicate
+            if any((currentMatrix == x).all() for x in globals.matrices):
+                globals.duplicates.append(currentMatrix)
+            else:
+                globals.matrices.append(currentMatrix)
+
             #print self.calcRTL(self.trafficMatrix,currentMatrix)
             #if RTLTemp < RTL_low:
             #    bestMatrix = matrix
             #    RTL_low = RTLTemp
-            globals.count += 1
-            print currentMatrix
+            # globals.count += 1
+
+
+
+            #print currentMatrix
             #print globals.count
             #print currentMatrix
             return
         else:
             rowList = []
+            srcNum = srcOrder[count]
             nodes = self.srcDict[srcNum]
-            k = int(self.topology.connectivityMatrix[:,0].sum())
+            k = int(self.topology.connectivityMatrix[:,srcNum].sum())
             k -= len(nodes)
             #Generate the rows that can still be allocated
             for i in range(self.dim):
@@ -264,6 +262,7 @@ class trafficManager:
                     for j in range(k - currentMatrix[i,:].sum()):
                         rowList.append(i)
             #This is how many units you can allocate after looking at current matrix
+            #Need to implement allocation using less than all of the available BUs!!
             if rowList:
                 for combination in combinations(rowList, k):
                     combination = list(combination)
@@ -271,10 +270,68 @@ class trafficManager:
                     for node in combination:
                         column[node] += 1
                     currentMatrix[:,srcNum] = column
-                    self.recursiveFunc(srcNum+1,copy(currentMatrix))
-                    #globals.count += 1
+                    self.recursiveFunc(count+1,srcOrder,copy(currentMatrix))
+            #         #globals.count += 1
             else:
-                self.recursiveFunc(srcNum+1,copy(currentMatrix))
+                self.recursiveFunc(count+1,srcOrder,copy(currentMatrix))
+                #globals.count += 1
+
+    def recursiveFunc(self,count,srcOrder,currentMatrix):
+        '''
+        Needs a list of of lists [[i1,j1],[i2,j2],etc...] so it knows how to progress (so it can skip evaluating 0 elements)
+        Generate the list of lists from the srcDict starting at src = 0 and ending at src = self.dim-1
+        '''
+        ### Exit Condition ###
+        if count == self.dim:
+            #Add 1 to each of the elements that are in the nodes list for each column
+
+            # for i in range(self.dim):
+            #     for j in range(self.dim):
+            #         if j in self.srcDict[i]:
+            #             currentMatrix[j,i] += 1
+
+            #Check to see if matrix is duplicate
+            if any((currentMatrix == x).all() for x in globals.matrices):
+                globals.duplicates.append(currentMatrix)
+            else:
+                globals.matrices.append(currentMatrix)
+
+            #print self.calcRTL(self.trafficMatrix,currentMatrix)
+            #if RTLTemp < RTL_low:
+            #    bestMatrix = matrix
+            #    RTL_low = RTLTemp
+            # globals.count += 1
+
+
+
+            #print currentMatrix
+            #print globals.count
+            #print currentMatrix
+            return
+        else:
+            rowList = []
+            srcNum = srcOrder[count]
+            nodes = self.srcDict[srcNum]
+            k = int(self.topology.connectivityMatrix[:,srcNum].sum())
+            k -= len(nodes)
+            #Generate the rows that can still be allocated
+            for i in range(self.dim):
+                if (currentMatrix[i,:].sum() < k) and (i in nodes):
+                    for j in range(k - currentMatrix[i,:].sum()):
+                        rowList.append(i)
+            #This is how many units you can allocate after looking at current matrix
+            #Need to implement allocation using less than all of the available BUs!!
+            if rowList:
+                for combination in combinations(rowList, k):
+                    combination = list(combination)
+                    column = np.zeros(self.dim).astype(int)
+                    for node in combination:
+                        column[node] += 1
+                    currentMatrix[:,srcNum] = column
+                    self.recursiveFunc(count+1,srcOrder,copy(currentMatrix))
+            #         #globals.count += 1
+            else:
+                self.recursiveFunc(count+1,srcOrder,copy(currentMatrix))
                 #globals.count += 1
 
     def genOptimizedTopologyTEST(self,filename,scaler):
@@ -283,22 +340,25 @@ class trafficManager:
         filename => File that new connections file will be written to
         ONLY USE W/ SCALER EQUAL TO 1
         '''
-        #self.recursiveFunc(0,np.array([[0 for x in range(self.topology.numDEST)] for y in range(self.topology.numDEST)]))
-
-        newCM = copy(self.topology.connectivityMatrix)
-        newCM = np.multiply(newCM,scaler)
-        #Iterate through sources (columns)
-        newCM = self.optimizeMatrix()
-        f = open(filename + 'TEST','w')
-        f.write("//Optimized Connections File\n//TraceFile: " + self.filename + '\n')
-        for i in range(self.dim):
-            f.write(str(i))
-            for j,element in enumerate(newCM[:,i]):
-                if element != 0:
-                    f.write(' ' + str(j) + '(' + str(element) + ')')
-            f.write('\n')
-        f.close()
-        print globals.count
+        #for x in permutations(range(self.dim)):
+        #    self.recursiveFunc(0,x,np.array([[0 for x in range(self.topology.dim)] for y in range(self.topology.dim)]))
+        self.recursiveFunc(0,range(self.dim),np.array([[0 for x in range(self.topology.dim)] for y in range(self.topology.dim)]))
+        print 'Total Unique Matrices:\t\t' + str(len(globals.matrices))
+        print 'Total Duplicate Matrices:\t' + str(len(globals.duplicates))
+        # newCM = copy(self.topology.connectivityMatrix)
+        # newCM = np.multiply(newCM,scaler)
+        # #Iterate through sources (columns)
+        # newCM = self.optimizeMatrix()
+        # f = open(filename + 'TEST','w')
+        # f.write("//Optimized Connections File\n//TraceFile: " + self.filename + '\n')
+        # for i in range(self.dim):
+        #     f.write(str(i))
+        #     for j,element in enumerate(newCM[:,i]):
+        #         if element != 0:
+        #             f.write(' ' + str(j) + '(' + str(element) + ')')
+        #     f.write('\n')
+        # f.close()
+        # print globals.count
         #return trafficManager(self.filename,topology(filename),scaler)
 
 
