@@ -14,12 +14,26 @@ class topology:
         self.populate()
 
     def populate(self):
+        '''
+        Initializes members
+        --------------
+        srcDict
+        dstDict
+        connectivityMatrix
+        dim
+        --------------
+        '''
         self.srcDict = {}
+        self.dstDict = {}
         self.connectivityMatrix = self.returnConnectivityMatrix()
         self.dim = self.connectivityMatrix.shape[0]
         for key, value in self.srcDict.iteritems():
             self.srcDict[key].sort()
+            for dst in value:
+                self.dstDict[dst].append(key)
         assert(self.dim == self.connectivityMatrix.shape[1])
+        for key, value in self.dstDict.iteritems():
+            self.dstDict[key].sort()
 
     def returnConnectivityMatrix(self):
         '''
@@ -45,6 +59,7 @@ class topology:
             if len(line) > 1:
                 src = int(line[0])
                 self.srcDict[src] = []
+                self.dstDict[src] = []
                 for i in range((len(line)-1)/2):
                     dest = int(line[2*i+1])
                     bw = int(line[2*i+2])

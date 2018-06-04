@@ -20,7 +20,7 @@ def printTraffic(baselineConnections,dir):
 
 def printConnectivity(baselineConnections,dir,scaler):
     '''
-    prints original conenctivity matrix
+    prints original connectivity matrix
     prints all optimized connectivity matrices for log files in dir.
     Prints => generates .mat file in matlab directory
     scaler is the multiplier for BUs (larger scaler => finer granularity of provisioning)
@@ -56,9 +56,26 @@ if __name__ == "__main__":
     # printTraffic(baselineConnections,dir)
     # #SCALER ONLY => (1,2,4,8)
     # printConnectivity(baselineConnections,dir,1)
+
     ##### TEST #####
     baseLineTopology = topology("./connectionFiles/p3_x16Large")
-    #traceGen('./traceFiles/3x3_trace',baseLineTopology,100,None)
-    # TM_og = trafficManager('./traceFiles/3x3_trace',baseLineTopology,1)
     TM_og = trafficManager('./traceFiles/cifar10_alexnet_parameterserver_6473',baseLineTopology,1)
-    TM_new = TM_og.genOptimizedTopologyTEST("./connectionFiles/connectionsOptimized_TEST",1)
+
+    # baseLineTopology = topology("./connectionFiles/3x3")
+    # traceGen('./traceFiles/3x3_trace',baseLineTopology,100,None)
+    # TM_og = trafficManager('./traceFiles/3x3_trace',baseLineTopology,1)
+
+    TM_new1 = TM_og.genOptimizedTopology_LIMIT("./connectionFiles/testTestTest1",1)
+    # TM_new2 = TM_og.genOptimizedTopology_LIMIT("./connectionFiles/testTestTest2",2)
+    #TM_new4 = TM_og.genOptimizedTopology_LIMIT("./connectionFiles/testTestTest4",4)
+
+    print 'Original RTL:\t'+str(TM_og.returnRTL())
+    print 'Optimized RTL:\t'+str(TM_new1.returnRTL()) + ' [Scaler: '+str(TM_new1.scaler)+']'
+    # print 'Optimized RTL:\t'+str(TM_new2.returnRTL()) + ' [Scaler: '+str(TM_new2.scaler)+']'
+    #print 'Optimized RTL:\t'+str(TM_new4.returnRTL()) + ' [Scaler: '+str(TM_new4.scaler)+']'
+
+    #Print Graphs
+    # TM_og.topology.printConnectivity()
+    # TM_og.printTrafficMatrix()
+    # TM_new.topology.printConnectivity()
+    # plt.show()
